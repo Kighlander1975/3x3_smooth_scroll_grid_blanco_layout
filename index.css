@@ -1,0 +1,529 @@
+/* File: /index.css  */
+
+/*
+Layout © 2025 Kai Akkermann / kighlander.de
+Lizenz: CC BY-NC 4.0 – nicht-kommerzielle Nutzung, Credit-Link darf nicht entfernt werden.
+Siehe LICENSE.txt für Details.
+*/
+
+:root {
+	font-size: 16px;
+}
+
+html, body {
+	height: 100%;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+h1 {
+	font-size: 2.5rem;
+}
+
+h2 {
+	font-size: 2rem;
+}
+
+h3 {
+	font-size: 1.5rem;
+}
+
+h4 {
+	font-size: 1.25rem;
+}
+
+h5 {
+	font-size: 1.1rem;
+}
+
+h6, p {
+	font-size: 1rem;
+}
+
+.scroll-container {
+	width: 100vw;
+	height: 100vh;
+	overflow: scroll;
+	scroll-behavior: smooth;
+	position: relative;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE/Edge */
+}
+
+.scroll-container::-webkit-scrollbar {
+	display: none; /* Chrome/Safari */
+}
+
+.sections-inner {
+	width: 300vw;
+	height: 300vh;
+	position: relative;
+	background: radial-gradient(
+			circle at center,
+			#ff0000 0%,
+			#ff4000 7%,
+			#ff8000 14%,
+			#ffbf00 20%,
+			#ffff00 26%,
+			#bfff00 32%,
+			#80ff00 36%,
+			#40ff00 40%,
+			#00ff00 44%,
+			#00ff40 48%,
+			#00ff80 52%,
+			#00ffbf 56%,
+			#00ffff 62%,
+			#00e0ff 68%,
+			#00c0ff 74%,
+			#009fff 80%,
+			#007fff 85%,
+			#0040ff 89%,
+			#0000ff 92%,
+			#4000ff 95%,
+			#8000ff 97%,
+			#bf00ff 98.5%,
+			#ff00ff 100%
+	);
+	background-size: 100% 100%;
+	background-repeat: no-repeat;
+	background-position: center center;
+}
+
+.section {
+	width: 100vw;
+	height: 100vh;
+	position: absolute;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	min-height: 0;
+	min-width: 0;
+}
+
+/* Positionierung für 3x3 Grid */
+.section-1 {
+	left: 0vw;
+	top: 0vh;
+}
+
+.section-2 {
+	left: 100vw;
+	top: 0vh;
+}
+
+.section-3 {
+	left: 200vw;
+	top: 0vh;
+}
+
+.section-4 {
+	left: 0vw;
+	top: 100vh;
+}
+
+.section-5 {
+	left: 100vw;
+	top: 100vh;
+}
+
+.section-6 {
+	left: 200vw;
+	top: 100vh;
+}
+
+.section-7 {
+	left: 0vw;
+	top: 200vh;
+}
+
+.section-8 {
+	left: 100vw;
+	top: 200vh;
+}
+
+.section-9 {
+	left: 200vw;
+	top: 200vh;
+}
+
+
+/* Content-Grid für alle Seiten */
+.content-grid {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* 12x12 Grid für alle Seiten */
+.page-grid-12x12 {
+	display: grid;
+	grid-template-columns: repeat(12, 1fr);
+	grid-template-rows: repeat(12, 1fr);
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+}
+
+/* Allgemeiner Block */
+.block {
+	background: #fff;
+	border: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1rem;
+	font-family: sans-serif;
+	user-select: none;
+}
+
+/* Content-Bereich (zentral, 1-11) */
+.content-block {
+	grid-column: 2 / 12;
+	grid-row: 2 / 12;
+	text-align: left;
+	margin: 0;
+	border-radius: 1rem;
+	background: rgba(255, 255, 255, 0.5);
+	padding: 1rem;
+	box-sizing: border-box;
+	color: #222;
+	display: flex;
+	align-items: flex-start;
+	justify-content: flex-start;
+	z-index: 2;
+	border: 1px solid #000;
+}
+
+
+/* Seitendefinitionen */
+.section-1 .content-block {
+	grid-column: 1 / 12;
+	grid-row: 1 / 12;
+}
+
+.section-2 .content-block {
+	grid-column: 2 / 12;
+	grid-row: 1 / 12;
+}
+
+.section-3 .content-block {
+	grid-column: 2 / 13;
+	grid-row: 1 / 12;
+}
+
+.section-4 .content-block {
+	grid-column: 1 / 12;
+	grid-row: 2 / 12;
+}
+
+.section-5 .content-block {
+	grid-column: 2 / 12;
+	grid-row: 2 / 12;
+}
+
+.section-6 .content-block {
+	grid-column: 2 / 13;
+	grid-row: 2 / 12;
+}
+
+.section-7 .content-block {
+	grid-column: 1 / 12;
+	grid-row: 2 / 13;
+}
+
+.section-8 .content-block {
+	grid-column: 2 / 12;
+	grid-row: 2 / 13;
+}
+
+.section-9 .content-block {
+	grid-column: 2 / 13;
+	grid-row: 2 / 13;
+}
+
+/* Navigation-Buttons, Ecken und Kanten */
+.nav-btn {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	border: none;
+	background: #fff;
+	color: #222;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+	font-size: 2rem;
+	cursor: pointer;
+	transition: background 0.2s, transform 0.1s;
+	outline: none;
+	z-index: 3;
+	margin: 16px;
+}
+
+.nav-btn:focus,
+.nav-btn:hover {
+	background: #ffd54f;
+	color: #000;
+	transform: scale(1.08);
+}
+
+.nav-btn svg {
+	width: 36px;
+	height: 36px;
+	display: block;
+}
+
+/* Navigation-Block-Wrapper */
+.nav-block {
+	cursor: pointer;
+	transition: background 0.2s;
+	background: #eee;
+	color: #222;
+	border: none;
+	padding: 8px;
+	z-index: 3;
+}
+
+.nav-block:hover, .nav-block:focus {
+	background: #ffd54f;
+	outline: none;
+}
+
+/* Utility: für die 12x12-Grid-Positionierung */
+/* Margins für die Content-Kanten */
+.margin-top {
+	margin-top: 1rem !important;
+}
+
+.margin-right {
+	margin-right: 1rem !important;
+}
+
+.margin-bottom {
+	margin-bottom: 1rem !important;
+}
+
+.margin-left {
+	margin-left: 1rem !important;
+}
+
+/* Ecken */
+.nav-top-left {
+	grid-column: 1 / 2;
+	grid-row: 1 / 2;
+	align-self: start;
+	justify-self: start;
+}
+
+.nav-top-right {
+	grid-column: 12 / 13;
+	grid-row: 1 / 2;
+	align-self: start;
+	justify-self: end;
+}
+
+.nav-bottom-left {
+	grid-column: 1 / 2;
+	grid-row: 12 / 13;
+	align-self: end;
+	justify-self: start;
+}
+
+.nav-bottom-right {
+	grid-column: 12 / 13;
+	grid-row: 12 / 13;
+	align-self: end;
+	justify-self: end;
+}
+
+/* Kanten */
+.nav-left {
+	grid-column: 1 / 2;
+	grid-row: 6 / 8;
+	align-self: center;
+	justify-self: start;
+}
+
+.nav-right {
+	grid-column: 12 / 13;
+	grid-row: 6 / 8;
+	align-self: center;
+	justify-self: end;
+}
+
+.nav-top {
+	grid-column: 6 / 8;
+	grid-row: 1 / 2;
+	align-self: start;
+	justify-self: center;
+}
+
+.nav-bottom {
+	grid-column: 6 / 8;
+	grid-row: 12 / 13;
+	align-self: end;
+	justify-self: center;
+}
+
+/* Seite 1: Buttons wie gehabt */
+.section-1 .nav-right {
+	grid-column: 12 / 13;
+	grid-row: 6 / 8;
+}
+
+.section-1 .nav-bottom {
+	grid-column: 6 / 8;
+	grid-row: 12 / 13;
+}
+
+.section-1 .nav-corner {
+	grid-column: 12 / 13;
+	grid-row: 12 / 13;
+}
+
+/* Seite 5: Buttons an den Rändern wie im Schema */
+.section-5 .nav-top {
+	grid-column: 5 / 9;
+	grid-row: 1 / 2;
+}
+
+.section-5 .nav-bottom {
+	grid-column: 5 / 9;
+	grid-row: 12 / 13;
+}
+
+.section-5 .nav-left {
+	grid-column: 1 / 2;
+	grid-row: 5 / 9;
+}
+
+.section-5 .nav-right {
+	grid-column: 12 / 13;
+	grid-row: 5 / 9;
+}
+
+/* Seite 5: Ecken */
+.section-5 .nav-top-left {
+	grid-column: 1 / 2;
+	grid-row: 1 / 2;
+}
+
+.section-5 .nav-top-right {
+	grid-column: 12 / 13;
+	grid-row: 1 / 2;
+}
+
+.section-5 .nav-bottom-left {
+	grid-column: 1 / 2;
+	grid-row: 12 / 13;
+}
+
+.section-5 .nav-bottom-right {
+	grid-column: 12 / 13;
+	grid-row: 12 / 13;
+}
+
+.credit-link {
+	position: absolute;
+	right: 8.5rem;
+	bottom: 1.2rem;
+	font-size: 0.9rem;
+	color: #222;
+	background: rgba(255,255,255,0.7);
+	padding: 0.2rem 0.7rem;
+	border-radius: 0.8rem;
+	text-decoration: none;
+	opacity: 0.45;
+	z-index: 10;
+	transition: opacity 0.2s, background 0.2s, color 0.2s;
+	pointer-events: auto;
+}
+.credit-link:hover,
+.credit-link:focus {
+	opacity: 1;
+	background: #ffd54f;
+	color: #000;
+	text-decoration: underline;
+}
+
+@media (orientation: portrait) and (min-width: 360px) and (max-width: 430px) {
+	h1 {
+		font-size: 1.6rem;
+	}
+	
+	h2 {
+		font-size: 1.3rem;
+	}
+	
+	h3 {
+		font-size: 1.1rem;
+	}
+	
+	h4 {
+		font-size: 1rem;
+	}
+	
+	h5 {
+		font-size: 0.95rem;
+	}
+	
+	h6, p {
+		font-size: 0.9rem;
+	}
+	
+	.margin-top {
+		margin-top: 0rem !important;
+	}
+	
+	.margin-right {
+		margin-right: 0rem !important;
+	}
+	
+	.margin-bottom {
+		margin-bottom: 0rem !important;
+	}
+	
+	.margin-left {
+		margin-left: 0rem !important;
+	}
+	
+	.content-block {
+		grid-column: 1 / 13 !important;
+		grid-row: 2 / 12 !important;
+		padding: 1rem 0.5rem;
+		font-size: 1.1rem;
+		line-height: 1.5;
+		border-radius: 0.75rem;
+		margin: 1rem !important;
+	}
+	
+	.nav-btn {
+		width: 32px;
+		height: 32px;
+		font-size: 1rem;
+		margin: 4px;
+	}
+	
+	.nav-btn svg {
+		width: 28px !important;
+		height: 28px !important;
+	}
+	
+	/* Grid bleibt bei 12x12, aber Spalten werden breiter */
+	.page-grid-12x12 {
+		grid-template-columns: repeat(12, 1fr);
+		grid-template-rows: repeat(12, 1fr);
+	}
+	
+	.credit-link {
+		right: 35%;
+		bottom: 3.2rem;
+		font-size: 0.6rem;
+	}
+}

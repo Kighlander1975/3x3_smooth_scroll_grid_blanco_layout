@@ -1,0 +1,14 @@
+Copyright (c) 2025 Kai Akkermann / kighlander.de
+
+Dieses Layout steht unter der Creative Commons Namensnennung-NichtKommerziell 4.0 International Lizenz (CC BY-NC 4.0):
+https://creativecommons.org/licenses/by-nc/4.0/deed.de
+
+Bedingungen:
+- Die Nutzung, Bearbeitung und Weitergabe des Layouts ist ausschließlich für **nicht-kommerzielle Zwecke** erlaubt.
+- Der sichtbare Credit-Link ("© Layout: Kighlander.de") **muss in jeder veröffentlichten Kopie erhalten bleiben** und darf nicht entfernt oder verändert werden.
+- Bei Veröffentlichung oder Weitergabe ist der Urheber (siehe oben) zu nennen.
+
+Weitere Informationen zur Lizenz:
+https://creativecommons.org/licenses/by-nc/4.0/deed.de
+
+DIESES LAYOUT WIRD OHNE JEGLICHE GARANTIE BEREITGESTELLT.
