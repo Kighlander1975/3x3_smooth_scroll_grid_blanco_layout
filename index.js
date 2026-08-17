@@ -20,134 +20,612 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	const container = document.getElementById('scroll-container');
+	const DEFAULT_SECTION = 5;
+	const CURRENT_SECTION_STORAGE_KEY = 'alleinerziehend-vernetzt.currentSection';
+	const MOBILE_SWIPE_MIN_DISTANCE = 72;
+	const MOBILE_SWIPE_MIN_FLICK_DISTANCE = 28;
+	const MOBILE_SWIPE_MIN_VELOCITY = 0.45;
+	const MOBILE_SWIPE_AXIS_RATIO = 1.35;
+	const MOBILE_SWIPE_SNAP_DELAY = 380;
+	const GESTURE_LOCK_MIN_DISTANCE = 8;
+	const GESTURE_MODE_UNDECIDED = 'undecided';
+	const GESTURE_MODE_PAGER = 'pager';
+	const GESTURE_MODE_CONTENT_SCROLL = 'content_scroll';
+	const GESTURE_AXIS_HORIZONTAL = 'horizontal';
+	const GESTURE_AXIS_VERTICAL = 'vertical';
+	const DEBUG_GESTURES = false;
+	const DESKTOP_DRAG_MIN_DISTANCE = 5;
+	const INTERACTIVE_CONTENT_SELECTOR = 'a, button, input, select, textarea, label, summary, [role="button"], [tabindex]';
+	let currentSection = getInitialSection();
+	let snapTimeout = null;
+	let activeDesktopDrag = null;
+	let suppressNextDesktopClick = false;
 
-	function scrollToSectionFromHash() {
-		const hash = window.location.hash;
-		const match = hash.match(/^#section-(\d)$/);
-		if (match) {
-			const num = parseInt(match[1], 10);
-			const pos = sectionMap[num];
-			if (pos && container) {
-				container.scrollTo({
-					left: pos.col * window.innerWidth,
-					top: pos.row * window.innerHeight,
-					behavior: "smooth"
-				});
-			}
+	function getSectionFromHash() {
+		const match = window.location.hash.match(/^#section-(\d)$/);
+		const sectionNumber = match ? parseInt(match[1], 10) : null;
+		return sectionMap[sectionNumber] ? sectionNumber : null;
+	}
+
+	function getInitialSection() {
+		return getSectionFromHash() || getReloadSection() || DEFAULT_SECTION;
+	}
+
+	function getReloadSection() {
+		if (getNavigationType() !== 'reload') return null;
+
+		return getStoredSection();
+	}
+
+	function getNavigationType() {
+		const entries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
+		return entries.length ? entries[0].type : null;
+	}
+
+	function getStoredSection() {
+		try {
+			const sectionNumber = parseInt(sessionStorage.getItem(CURRENT_SECTION_STORAGE_KEY), 10);
+			return sectionMap[sectionNumber] ? sectionNumber : null;
+		} catch (e) {
+			return null;
 		}
 	}
 
-	scrollToSectionFromHash();
-	window.addEventListener("hashchange", scrollToSectionFromHash);
+	function storeCurrentSection(sectionNumber) {
+		if (!sectionMap[sectionNumber]) return;
 
-	document.addEventListener("keydown", function(e) {
-		if (e.key >= "1" && e.key <= "9") {
-			window.location.hash = "#section-" + e.key;
+		try {
+			sessionStorage.setItem(CURRENT_SECTION_STORAGE_KEY, String(sectionNumber));
+		} catch (e) {
+			// Session storage is optional; navigation must still work without it.
 		}
+	}
+
+	function getNearestSectionFromScroll() {
+		if (!container) return null;
+
+		const col = Math.round(container.scrollLeft / getViewportWidth());
+		const row = Math.round(container.scrollTop / getViewportHeight());
+
+		return findSectionByPosition(col, row);
+	}
+
+	function getViewportWidth() {
+		return container ? container.clientWidth : window.innerWidth;
+	}
+
+	function getViewportHeight() {
+		return container ? container.clientHeight : window.innerHeight;
+	}
+
+	function findScrollableAncestor(target) {
+		let current = target;
+		const result = {
+			x: null,
+			y: null
+		};
+
+		while (current && current !== container) {
+			if (!result.y && isScrollableOnAxis(current, 'y')) {
+				result.y = current;
+			}
+			if (!result.x && isScrollableOnAxis(current, 'x')) {
+				result.x = current;
+			}
+			if (result.x && result.y) break;
+			current = current.parentElement;
+		}
+
+		return result;
+	}
+
+	function isScrollableOnAxis(element, axis) {
+		const style = window.getComputedStyle(element);
+		const overflow = axis === 'x' ? style.overflowX : style.overflowY;
+		const allowsScroll = overflow === 'auto' || overflow === 'scroll';
+
+		if (!allowsScroll) return false;
+
+		if (axis === 'x') {
+			return element.scrollWidth > element.clientWidth;
+		}
+
+		return element.scrollHeight > element.clientHeight;
+	}
+
+	function findSectionByPosition(col, row) {
+		for (let num in sectionMap) {
+			const pos = sectionMap[num];
+			if (pos.col === col && pos.row === row) {
+				return parseInt(num, 10);
+			}
+		}
+
+		return null;
+	}
+
+	function setContainerPosition(sectionNumber, behavior) {
+		if (!container || !sectionMap[sectionNumber]) return;
+
+		const pos = sectionMap[sectionNumber];
+		container.scrollTo({
+			left: pos.col * getViewportWidth(),
+			top: pos.row * getViewportHeight(),
+			behavior: behavior
+		});
+	}
+
+	function snapToSection(sectionNumber) {
+		if (!container || !sectionMap[sectionNumber]) return;
+
+		const previousScrollBehavior = container.style.scrollBehavior;
+		container.style.scrollBehavior = 'auto';
+		setContainerPosition(sectionNumber, 'auto');
+		container.style.scrollBehavior = previousScrollBehavior;
+	}
+
+	function navigateToSection(sectionNumber, options) {
+		if (!sectionMap[sectionNumber]) return false;
+
+		const settings = Object.assign({
+			behavior: 'smooth',
+			updateHash: true,
+			replaceHash: false
+		}, options || {});
+
+		currentSection = sectionNumber;
+		storeCurrentSection(sectionNumber);
+		setContainerPosition(sectionNumber, settings.behavior);
+
+		window.clearTimeout(snapTimeout);
+		if (settings.behavior === 'smooth') {
+			snapTimeout = window.setTimeout(function() {
+				snapToSection(sectionNumber);
+			}, MOBILE_SWIPE_SNAP_DELAY);
+		} else {
+			snapToSection(sectionNumber);
+		}
+
+		const nextHash = '#section-' + sectionNumber;
+		if (settings.updateHash && window.location.hash !== nextHash) {
+			if (settings.replaceHash) {
+				window.history.replaceState(null, '', nextHash);
+			} else {
+				window.history.pushState(null, '', nextHash);
+			}
+		}
+
+		updateDesktopNavOverlay();
+		return true;
+	}
+
+	function navigateFromHash(options) {
+		const sectionNumber = getSectionFromHash();
+		if (sectionNumber) {
+			navigateToSection(sectionNumber, Object.assign({
+				updateHash: false
+			}, options || {}));
+		}
+	}
+
+	function navigateByOffset(colDelta, rowDelta, options) {
+		const current = currentSection || getSectionFromHash() || getNearestSectionFromScroll() || DEFAULT_SECTION;
+		const pos = sectionMap[current];
+		const targetSection = findSectionByPosition(pos.col + colDelta, pos.row + rowDelta);
+
+		if (!targetSection) {
+			navigateToSection(current, Object.assign({
+				behavior: 'auto',
+				updateHash: false
+			}, options || {}));
+			return false;
+		}
+
+		return navigateToSection(targetSection, options);
+	}
+
+	if (getSectionFromHash()) {
+		navigateFromHash({behavior: 'auto'});
+	} else {
+		navigateToSection(currentSection, {behavior: 'auto', updateHash: false});
+	}
+	window.addEventListener("hashchange", function() {
+		navigateFromHash({behavior: 'smooth'});
+	});
+	window.addEventListener("popstate", function() {
+		navigateFromHash({behavior: 'smooth'});
 	});
 
 	document.addEventListener("keydown", function(e) {
-		if (e.key >= "1" && e.key <= "9") {
-			window.location.hash = "#section-" + e.key;
+		const numpadSectionMap = {
+			Numpad7: 1,
+			Numpad8: 2,
+			Numpad9: 3,
+			Numpad4: 4,
+			Numpad5: 5,
+			Numpad6: 6,
+			Numpad1: 7,
+			Numpad2: 8,
+			Numpad3: 9
+		};
+
+		if (numpadSectionMap[e.code]) {
+			navigateToSection(numpadSectionMap[e.code]);
 			return;
 		}
 
-		// Pfeiltasten-Navigation
-		const hash = window.location.hash;
-		const match = hash.match(/^#section-(\d)$/);
-		let current = match ? parseInt(match[1], 10) : 5; // Standard: Mitte
-		let pos = sectionMap[current];
-
-		let targetPos = null;
-		if (e.key === "ArrowUp")    targetPos = {col: pos.col, row: pos.row - 1};
-		if (e.key === "ArrowDown")  targetPos = {col: pos.col, row: pos.row + 1};
-		if (e.key === "ArrowLeft")  targetPos = {col: pos.col - 1, row: pos.row};
-		if (e.key === "ArrowRight") targetPos = {col: pos.col + 1, row: pos.row};
-
-		if (targetPos) {
-			// Zielnummer finden
-			let targetNum = null;
-			for (let num in sectionMap) {
-				let p = sectionMap[num];
-				if (p.col === targetPos.col && p.row === targetPos.row) {
-					targetNum = num;
-					break;
-				}
-			}
-			if (targetNum) {
-				window.location.hash = "#section-" + targetNum;
-				e.preventDefault(); // verhindert Scrollen des Browsers
-			}
+		if (e.key >= "1" && e.key <= "9") {
+			navigateToSection(parseInt(e.key, 10));
+			return;
 		}
+
+		if (e.key === "ArrowUp")    navigateByOffset(0, -1);
+		if (e.key === "ArrowDown")  navigateByOffset(0, 1);
+		if (e.key === "ArrowLeft")  navigateByOffset(-1, 0);
+		if (e.key === "ArrowRight") navigateByOffset(1, 0);
+
+		if (e.key.startsWith("Arrow")) e.preventDefault();
 	});
-	
+	document.addEventListener('wheel', handleDesktopWheel, {passive: false, capture: true});
+	document.addEventListener('pointerdown', startDesktopDrag);
+	document.addEventListener('pointermove', moveDesktopDrag, {passive: false});
+	document.addEventListener('pointerup', finishDesktopDrag);
+	document.addEventListener('pointercancel', cancelDesktopDrag);
+	document.addEventListener('click', suppressDesktopDragClick, true);
+
 	// Ab hier Swipe Code
-	// Swipe-Logik für den scroll-container (immer nur eine Section pro Swipe)
-	let touchStartX = 0;
-	let touchStartY = 0;
+	// Swipe-Logik für den scroll-container (immer nur eine Section pro Swipe).
+	let activePointerGesture = null;
 
 	if (container) {
-		container.addEventListener('touchstart', function(e) {
-			if (e.touches.length === 1) {
-				touchStartX = e.touches[0].clientX;
-				touchStartY = e.touches[0].clientY;
-			}
+		container.addEventListener('pointerdown', function(e) {
+			if (!e.isPrimary || e.pointerType === 'mouse') return;
+
+			const scrollableAncestor = findScrollableAncestor(e.target);
+			activePointerGesture = {
+				pointerId: e.pointerId,
+				startX: e.clientX,
+				startY: e.clientY,
+				lastX: e.clientX,
+				lastY: e.clientY,
+				startTime: performance.now(),
+				section: currentSection || getSectionFromHash() || getNearestSectionFromScroll() || DEFAULT_SECTION,
+				scrollableAncestor: scrollableAncestor,
+				mode: GESTURE_MODE_UNDECIDED,
+				axis: null,
+				scrollElement: null,
+				startScrollLeft: 0,
+				startScrollTop: 0
+			};
 		});
 
-		container.addEventListener('touchend', function(e) {
-			const touchEndX = e.changedTouches[0].clientX;
-			const touchEndY = e.changedTouches[0].clientY;
+		container.addEventListener('pointermove', function(e) {
+			if (!activePointerGesture || e.pointerId !== activePointerGesture.pointerId) return;
 
-			const dx = touchEndX - touchStartX;
-			const dy = touchEndY - touchStartY;
-			const minDist = 50; // Mindestdistanz zum Auslösen (px)
+			activePointerGesture.lastX = e.clientX;
+			activePointerGesture.lastY = e.clientY;
+			classifyPointerGesture(activePointerGesture);
 
-			// Nur eine Richtung pro Swipe: die mit der größeren Differenz
-			if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minDist) {
-				// Horizontaler Swipe (nur eins weiter!)
-				if (dx > 0) {
-					swipeTo('left');
-				} else {
-					swipeTo('right');
-				}
-			} else if (Math.abs(dy) > minDist) {
-				// Vertikaler Swipe (nur eins weiter!)
-				if (dy > 0) {
-					swipeTo('up');
-				} else {
-					swipeTo('down');
-				}
+			if (activePointerGesture.mode !== GESTURE_MODE_UNDECIDED) {
+				e.preventDefault();
 			}
-		});
+
+			if (activePointerGesture.mode === GESTURE_MODE_CONTENT_SCROLL) {
+				scrollGestureContent(activePointerGesture);
+			}
+		}, {passive: false});
+
+		container.addEventListener('pointerup', finishPointerGesture);
+		container.addEventListener('pointercancel', cancelPointerGesture);
 	}
 
-	function swipeTo(direction) {
-		const hash = window.location.hash;
-		const match = hash.match(/^#section-(\d)$/);
-		let current = match ? parseInt(match[1], 10) : 5; // Standard: Mitte
-		let pos = sectionMap[current];
+	function handleDesktopWheel(e) {
+		if (!isDesktopPointer()) return;
 
-		let targetPos = null;
-		if (direction === "up")    targetPos = {col: pos.col, row: pos.row - 1};
-		if (direction === "down")  targetPos = {col: pos.col, row: pos.row + 1};
-		if (direction === "left")  targetPos = {col: pos.col - 1, row: pos.row};
-		if (direction === "right") targetPos = {col: pos.col + 1, row: pos.row};
+		const scrollableAncestor = findScrollableAncestor(e.target);
 
-		if (targetPos) {
-			// Zielnummer finden
-			let targetNum = null;
-			for (let num in sectionMap) {
-				let p = sectionMap[num];
-				if (p.col === targetPos.col && p.row === targetPos.row) {
-					targetNum = num;
-					break;
-				}
-			}
-			if (targetNum) {
-				window.location.hash = "#section-" + targetNum;
-			}
+		e.preventDefault();
+
+		if (scrollableAncestor.x && e.deltaX !== 0) {
+			scrollableAncestor.x.scrollLeft += e.deltaX;
+		}
+		if (scrollableAncestor.y && e.deltaY !== 0) {
+			scrollableAncestor.y.scrollTop += e.deltaY;
+		}
+
+		snapToSection(currentSection);
+	}
+
+	function isDesktopPointer() {
+		return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+	}
+
+	function startDesktopDrag(e) {
+		if (!isDesktopPointer() || e.pointerType !== 'mouse' || e.button !== 0) return;
+		if (e.target.closest('.desktop-nav-zone')) return;
+
+		const scrollableAncestor = findScrollableAncestor(e.target);
+		if (!scrollableAncestor.x && !scrollableAncestor.y) return;
+
+		activeDesktopDrag = {
+			pointerId: e.pointerId,
+			startX: e.clientX,
+			startY: e.clientY,
+			lastX: e.clientX,
+			lastY: e.clientY,
+			scrollableAncestor: scrollableAncestor,
+			axis: null,
+			scrollElement: null,
+			captureElement: e.target,
+			startedOnInteractive: Boolean(e.target.closest(INTERACTIVE_CONTENT_SELECTOR)),
+			startScrollLeft: 0,
+			startScrollTop: 0,
+			didDrag: false
+		};
+	}
+
+	function moveDesktopDrag(e) {
+		if (!activeDesktopDrag || e.pointerId !== activeDesktopDrag.pointerId) return;
+
+		if ((e.buttons & 1) !== 1) {
+			cancelDesktopDrag(e);
+			return;
+		}
+
+		activeDesktopDrag.lastX = e.clientX;
+		activeDesktopDrag.lastY = e.clientY;
+
+		if (!activeDesktopDrag.axis) {
+			lockDesktopDragAxis(activeDesktopDrag);
+		}
+
+		if (!activeDesktopDrag || !activeDesktopDrag.scrollElement) return;
+
+		activeDesktopDrag.didDrag = true;
+		e.preventDefault();
+
+		if (activeDesktopDrag.axis === GESTURE_AXIS_HORIZONTAL) {
+			activeDesktopDrag.scrollElement.scrollLeft =
+				activeDesktopDrag.startScrollLeft - (activeDesktopDrag.lastX - activeDesktopDrag.startX);
+		} else {
+			activeDesktopDrag.scrollElement.scrollTop =
+				activeDesktopDrag.startScrollTop - (activeDesktopDrag.lastY - activeDesktopDrag.startY);
+		}
+
+		snapToSection(currentSection);
+	}
+
+	function lockDesktopDragAxis(drag) {
+		const dx = drag.lastX - drag.startX;
+		const dy = drag.lastY - drag.startY;
+		const absX = Math.abs(dx);
+		const absY = Math.abs(dy);
+
+		if (Math.max(absX, absY) < DESKTOP_DRAG_MIN_DISTANCE) return;
+
+		const axis = absX > absY ? GESTURE_AXIS_HORIZONTAL : GESTURE_AXIS_VERTICAL;
+		const scrollElement = axis === GESTURE_AXIS_HORIZONTAL ?
+			drag.scrollableAncestor.x :
+			drag.scrollableAncestor.y;
+
+		if (!scrollElement) {
+			activeDesktopDrag = null;
+			return;
+		}
+
+		drag.axis = axis;
+		drag.scrollElement = scrollElement;
+		drag.startScrollLeft = scrollElement.scrollLeft;
+		drag.startScrollTop = scrollElement.scrollTop;
+		scrollElement.classList.add('is-dragging');
+
+		if (drag.captureElement.setPointerCapture) {
+			drag.captureElement.setPointerCapture(drag.pointerId);
 		}
 	}
+
+	function finishDesktopDrag(e) {
+		if (!activeDesktopDrag || e.pointerId !== activeDesktopDrag.pointerId) return;
+
+		if (activeDesktopDrag.didDrag) {
+			suppressNextDesktopClick = true;
+			window.setTimeout(function() {
+				suppressNextDesktopClick = false;
+			}, 250);
+		}
+
+		cancelDesktopDrag(e);
+	}
+
+	function cancelDesktopDrag(e) {
+		if (!activeDesktopDrag || e.pointerId !== activeDesktopDrag.pointerId) return;
+
+		if (activeDesktopDrag.scrollElement) {
+			activeDesktopDrag.scrollElement.classList.remove('is-dragging');
+		}
+		if (activeDesktopDrag.captureElement &&
+			activeDesktopDrag.captureElement.hasPointerCapture &&
+			activeDesktopDrag.captureElement.hasPointerCapture(e.pointerId)) {
+			activeDesktopDrag.captureElement.releasePointerCapture(e.pointerId);
+		}
+
+		activeDesktopDrag = null;
+		snapToSection(currentSection);
+	}
+
+	function suppressDesktopDragClick(e) {
+		if (!suppressNextDesktopClick) return;
+
+		suppressNextDesktopClick = false;
+		e.preventDefault();
+		e.stopPropagation();
+	}
+
+	function finishPointerGesture(e) {
+		if (!activePointerGesture || e.pointerId !== activePointerGesture.pointerId) return;
+
+		activePointerGesture.lastX = e.clientX;
+		activePointerGesture.lastY = e.clientY;
+		handlePointerGesture(activePointerGesture);
+		cancelPointerGesture(e);
+	}
+
+	function cancelPointerGesture(e) {
+		if (!activePointerGesture || e.pointerId !== activePointerGesture.pointerId) return;
+
+		if (container.hasPointerCapture(e.pointerId)) {
+			container.releasePointerCapture(e.pointerId);
+		}
+		activePointerGesture = null;
+	}
+
+	function classifyPointerGesture(gesture) {
+		if (gesture.mode !== GESTURE_MODE_UNDECIDED) return;
+
+		const metrics = getGestureMetrics(gesture);
+		if (metrics.dominantDistance < GESTURE_LOCK_MIN_DISTANCE) return;
+		if (!metrics.isClearAxis) return;
+
+		if (!gesture.axis) {
+			gesture.axis = metrics.isHorizontal ? GESTURE_AXIS_HORIZONTAL : GESTURE_AXIS_VERTICAL;
+		}
+
+		if (isGestureFlick(metrics, gesture.axis)) {
+			lockGestureMode(gesture, GESTURE_MODE_PAGER, null, metrics);
+			return;
+		}
+
+		const scrollElement = gesture.axis === GESTURE_AXIS_HORIZONTAL ?
+			gesture.scrollableAncestor.x :
+			gesture.scrollableAncestor.y;
+
+		if (scrollElement) {
+			if (getAxisVelocity(metrics, gesture.axis) >= MOBILE_SWIPE_MIN_VELOCITY &&
+				getAxisDistance(metrics, gesture.axis) < MOBILE_SWIPE_MIN_FLICK_DISTANCE) {
+				return;
+			}
+
+			lockGestureMode(gesture, GESTURE_MODE_CONTENT_SCROLL, scrollElement, metrics);
+			return;
+		}
+
+		lockGestureMode(gesture, GESTURE_MODE_PAGER, null, metrics);
+	}
+
+	function lockGestureMode(gesture, mode, scrollElement, metrics) {
+		gesture.mode = mode;
+		gesture.scrollElement = scrollElement;
+
+		if (scrollElement) {
+			gesture.startScrollLeft = scrollElement.scrollLeft;
+			gesture.startScrollTop = scrollElement.scrollTop;
+		}
+
+		if (!container.hasPointerCapture(gesture.pointerId)) {
+			container.setPointerCapture(gesture.pointerId);
+		}
+
+		debugGesture(gesture, metrics);
+	}
+
+	function scrollGestureContent(gesture) {
+		if (!gesture.scrollElement) return;
+
+		const dx = gesture.lastX - gesture.startX;
+		const dy = gesture.lastY - gesture.startY;
+
+		if (gesture.axis === GESTURE_AXIS_HORIZONTAL) {
+			gesture.scrollElement.scrollLeft = gesture.startScrollLeft - dx;
+			return;
+		}
+
+		gesture.scrollElement.scrollTop = gesture.startScrollTop - dy;
+	}
+
+	function handlePointerGesture(gesture) {
+		if (gesture.mode === GESTURE_MODE_CONTENT_SCROLL) {
+			navigateToSection(gesture.section, {behavior: 'auto', updateHash: false});
+			return;
+		}
+
+		const dx = gesture.lastX - gesture.startX;
+		const dy = gesture.lastY - gesture.startY;
+		const metrics = getGestureMetrics(gesture);
+		const hasDistance = getAxisDistance(metrics, gesture.axis) >= MOBILE_SWIPE_MIN_DISTANCE;
+		const hasFlickVelocity = isGestureFlick(metrics, gesture.axis);
+
+		currentSection = gesture.section;
+
+		if (gesture.mode !== GESTURE_MODE_PAGER || !metrics.isClearAxis || (!hasDistance && !hasFlickVelocity)) {
+			navigateToSection(gesture.section, {behavior: 'auto', updateHash: false});
+			return;
+		}
+
+		if (gesture.axis === GESTURE_AXIS_HORIZONTAL) {
+			navigateByOffset(dx < 0 ? 1 : -1, 0);
+			return;
+		}
+
+		navigateByOffset(0, dy < 0 ? 1 : -1);
+	}
+
+	function getGestureMetrics(gesture) {
+		const dx = gesture.lastX - gesture.startX;
+		const dy = gesture.lastY - gesture.startY;
+		const duration = Math.max(performance.now() - gesture.startTime, 1);
+		const absX = Math.abs(dx);
+		const absY = Math.abs(dy);
+		const dominantDistance = Math.max(absX, absY);
+		const secondaryDistance = Math.min(absX, absY);
+		const velocity = dominantDistance / duration;
+		const isHorizontal = absX > absY;
+		const isClearAxis = secondaryDistance === 0 || dominantDistance / secondaryDistance >= MOBILE_SWIPE_AXIS_RATIO;
+
+		return {
+			dx: dx,
+			dy: dy,
+			duration: duration,
+			dominantDistance: dominantDistance,
+			absX: absX,
+			absY: absY,
+			velocity: velocity,
+			isHorizontal: isHorizontal,
+			isClearAxis: isClearAxis
+		};
+	}
+
+	function isGestureFlick(metrics, axis) {
+		return metrics.isClearAxis &&
+			getAxisDistance(metrics, axis) >= MOBILE_SWIPE_MIN_FLICK_DISTANCE &&
+			getAxisVelocity(metrics, axis) >= MOBILE_SWIPE_MIN_VELOCITY;
+	}
+
+	function getAxisDistance(metrics, axis) {
+		return axis === GESTURE_AXIS_HORIZONTAL ? metrics.absX : metrics.absY;
+	}
+
+	function getAxisVelocity(metrics, axis) {
+		return getAxisDistance(metrics, axis) / metrics.duration;
+	}
+
+	function debugGesture(gesture, metrics) {
+		if (!DEBUG_GESTURES) return;
+
+		console.log('gesture', {
+			axis: gesture.axis,
+			mode: gesture.mode,
+			distance: Math.round(getAxisDistance(metrics, gesture.axis)),
+			duration: Math.round(metrics.duration),
+			velocity: Number(getAxisVelocity(metrics, gesture.axis).toFixed(2))
+		});
+	}
+
+	window.addEventListener('resize', function() {
+		navigateToSection(currentSection, {
+			behavior: 'auto',
+			updateHash: false
+		});
+	});
 
 	// Hilfsfunktion für SVG-Pfeile
 	function getArrowSvg(direction) {
@@ -163,6 +641,76 @@ document.addEventListener("DOMContentLoaded", function () {
 			default: return "";
 		}
 	}
+
+	function createDesktopNavOverlay() {
+		const directions = [
+			{direction: 'up', className: 'desktop-nav-top', colDelta: 0, rowDelta: -1},
+			{direction: 'right', className: 'desktop-nav-right', colDelta: 1, rowDelta: 0},
+			{direction: 'down', className: 'desktop-nav-bottom', colDelta: 0, rowDelta: 1},
+			{direction: 'left', className: 'desktop-nav-left', colDelta: -1, rowDelta: 0}
+		];
+		const overlay = document.createElement('div');
+		overlay.className = 'desktop-nav-overlay';
+
+		directions.forEach(function(config) {
+			const zone = document.createElement('div');
+			const button = document.createElement('button');
+
+			zone.className = 'desktop-nav-zone ' + config.className;
+			zone.setAttribute('data-direction', config.direction);
+			button.className = 'desktop-nav-btn';
+			button.type = 'button';
+			button.innerHTML = getArrowSvg(config.direction);
+
+			zone.addEventListener('click', function() {
+				const target = getSectionByOffset(currentSection, config.colDelta, config.rowDelta);
+				if (target) {
+					navigateToSection(target);
+					button.blur();
+				}
+			});
+			button.addEventListener('click', function(e) {
+				e.stopPropagation();
+				zone.click();
+			});
+
+			zone.appendChild(button);
+			overlay.appendChild(zone);
+		});
+
+		document.body.appendChild(overlay);
+		updateDesktopNavOverlay();
+	}
+
+	function updateDesktopNavOverlay() {
+		const overlay = document.querySelector('.desktop-nav-overlay');
+		if (!overlay) return;
+
+		const directionMap = {
+			up: {colDelta: 0, rowDelta: -1},
+			right: {colDelta: 1, rowDelta: 0},
+			down: {colDelta: 0, rowDelta: 1},
+			left: {colDelta: -1, rowDelta: 0}
+		};
+
+		overlay.querySelectorAll('.desktop-nav-zone').forEach(function(zone) {
+			const direction = zone.getAttribute('data-direction');
+			const offset = directionMap[direction];
+			const target = offset ? getSectionByOffset(currentSection, offset.colDelta, offset.rowDelta) : null;
+
+			zone.classList.toggle('is-disabled', !target);
+			zone.setAttribute('aria-hidden', target ? 'false' : 'true');
+		});
+	}
+
+	function getSectionByOffset(sectionNumber, colDelta, rowDelta) {
+		const pos = sectionMap[sectionNumber];
+		if (!pos) return null;
+
+		return findSectionByPosition(pos.col + colDelta, pos.row + rowDelta);
+	}
+
+	createDesktopNavOverlay();
 
 	// Konfiguration für jede Seite
 	const pageConfigs = {
@@ -308,32 +856,30 @@ document.addEventListener("DOMContentLoaded", function () {
 			// 6. Event-Listener für Buttons
 			sectionGrid.querySelectorAll('.nav-btn').forEach(btn => {
 				btn.addEventListener('click', e => {
-					const target = btn.getAttribute('data-target');
-					if (target) window.location.hash = '#section-' + target;
+					const target = parseInt(btn.getAttribute('data-target'), 10);
+					if (target) navigateToSection(target);
 				});
 				btn.addEventListener('keydown', e => {
 					if (e.key === 'Enter' || e.key === ' ') {
-						const target = btn.getAttribute('data-target');
-						if (target) window.location.hash = '#section-' + target;
+						const target = parseInt(btn.getAttribute('data-target'), 10);
+						if (target) navigateToSection(target);
 					}
 				});
 			});
 		}
 	});
 
+	document.querySelectorAll('[data-alert-message]').forEach(function(element) {
+		element.addEventListener('dragstart', function(e) {
+			e.preventDefault();
+		});
+		element.addEventListener('click', function(e) {
+			e.preventDefault();
+			window.alert(element.getAttribute('data-alert-message'));
+		});
+	});
+
 });
-// Copyright/Credit-Link dynamisch in jede Section einfügen
-// DIESER TEIL DARF NICHT ENTFERNT WERDEN, ES VERSTÖSST GEGEN URHEBERRECHT
-document.querySelectorAll('.content-grid').forEach(grid => {
-	// Prüfen, ob schon ein Credit-Link existiert (doppelt vermeiden)
-	if (!grid.querySelector('.credit-link')) {
-		const link = document.createElement('a');
-		link.className = 'credit-link';
-		link.href = 'https://kighlander.de';
-		link.target = '_blank';
-		link.rel = 'noopener';
-		link.title = 'Layout von Kighlander.de';
-		link.textContent = '© Layout: Kighlander.de';
-		grid.appendChild(link);
-	}
-});
+
+// Layout credit: Kai Akkermann / kighlander.de.
+// Der sichtbare Copyright-Hinweis wird in diesem Projekt nicht ausgegeben.
